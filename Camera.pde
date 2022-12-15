@@ -26,14 +26,13 @@ class Camera
         imageMode(CORNER);
         clip(x, y, camW, camH);
 
-        imageMode(CENTER);
-
         pushMatrix();
             translate(x+camW/2, y+camH/2); //Offset relative to cam center
                 scale(effectiveZoom); //Perform camera transformations
-                translate(posX, posY); //Undo
             translate(-x-camW/2, -y-camH/2); //Un-offset relative to cam TL corner
+            translate(posX, posY); //Undo
 
+        imageMode(CENTER);
         image(img, x, y, imgW, imgH);
 
         popMatrix();
@@ -42,6 +41,34 @@ class Camera
         stroke(255);
         line(x+camW/2, y+camH/2-crosshairSize, x+camW/2, y+camH/2+crosshairSize);
         line(x+camW/2-crosshairSize, y+camH/2, x+camW/2 + crosshairSize, y+camH/2);
+    }
+
+    //gridW/gridH are the number of lines to draw for each axis; corresponding to the size of the output image
+    void renderGrid(int imgW, int imgH, int x, int y, int stepSizeX, int stepSizeY, int gridW, int gridH)
+    {
+        pushMatrix();
+            translate(x+camW/2, y+camH/2); //Offset relative to cam center
+                scale(effectiveZoom); //Perform camera transformations
+            translate(-x-camW/2, -y-camH/2); //Un-offset relative to cam TL corner
+            translate(posX, posY); //Undo
+
+        //Draw vert. lines
+        // for(int i = x-imgW/2; i <= x+imgW/2; i += stepSizeX)
+        for(int i = 0; i <= gridW; i++)
+        {
+            int lineX = i*stepSizeX - imgW/2;
+            line(lineX, -imgH/2, lineX, imgH/2);
+        }
+
+        //Draw horiz. lines
+        // for(int j = y-imgH/2; j <= y+imgH/2; j += stepSizeY)
+        for(int j = 0; j <= gridH; j++)
+        {
+            int lineY = j*stepSizeY - imgH/2;
+            line(-imgW/2, lineY, imgW/2, lineY);
+        }
+
+        popMatrix();
     }
 
     void move(int dx, int dy)

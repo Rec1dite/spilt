@@ -10,7 +10,7 @@ static final int fullHoverBounds = 20;
 
 Camera camera;
 
-PImage input, output;
+PImage input = null, palettized = null, output = null;
 int stepSizeX = 1, stepSizeY = 1;
 
 color[] palette;
@@ -63,7 +63,7 @@ void setup()
     nbxHuePalette = cp5.addNumberbox("hue")
                    .setPosition(width/2+20, height-150)
                    .setSize(200, 20)
-                   .setRange(1, 128)
+                   .setRange(0, 128)
                    .setScrollSensitivity(1.0)
                    .setDirection(Controller.HORIZONTAL)
                    .setValue(0);
@@ -81,85 +81,6 @@ class Color
 
 //Extract pixel art, each pixel is the average of surrounding pixels
 //then find common color palette from output image
-
-//Determine a likely colour palette from the input image
-color[] palettize(int numColors)
-{
-    input.loadPixels();
-
-    //Algo1: Partition the image, pick the best palette from each partition, then cascade upwards
-    //Algo2: Group colors by hue, then lightness, then saturation
-    //       Calculate average for each group and use that as the color
-
-    ArrayList<ArrayList<Color>> colGroups = new ArrayList<ArrayList<Color>>();
-    for(int g = 0; g < numColors; g++)
-    {
-        colGroups.add(new ArrayList<Color>());
-    }
-
-    // (1) Generate color groups
-    float max = -100000, min = 100000;
-    for(int x = 0; x < input.width; x++)
-    {
-        for(int y = 0; y < input.height; y++)
-        {
-            color pix = input.pixels[x + y*input.width];
-            float h = hue(pix); //0-255
-            float s = saturation(pix); //0-255
-            float b = brightness(pix); //0-255
-
-            if(b > max) { max = b; }
-            if(b < min) { min = b; }
-
-            int group = (int)(numColors*(10*h + 5*s + 10*b)/(25*256.0));
-
-
-
-            colGroups.get(group).add(new Color(pix));
-        }
-    }
-    // print("max = " + max + "; min = " + min + "\n");
-
-
-    // (2) Calculate average color for each group
-    color[] groupAves = new color[numColors];
-    for(int g = 0; g < numColors; g++)
-    {
-        float rTot = 0, gTot = 0, bTot = 0;
-        ArrayList<Color> group = colGroups.get(g);
-        int groupSize = group.size();
-
-        for(int c = 0; c < groupSize; c++)
-        {
-            color col = group.get(c).value;
-
-            rTot += (col >> 16) & 0xFF;
-            gTot += (col >> 8) & 0xFF;
-            bTot += col & 0xFF;
-        }
-
-        groupAves[g] = color(rTot/groupSize, gTot/groupSize, bTot/groupSize);
-    }
-
-    output = createImage(input.width, input.height, RGB);
-    output.loadPixels();
-
-    // (3) Set each color to the corresponding group average
-    for(int x = 0; x < input.width; x++)
-    {
-        for(int y = 0; y < input.height; y++)
-        {
-            color pix = input.pixels[x + y*input.width];
-            float h = hue(pix);
-            int group = (int)(numColors*h/256.0);
-
-            output.pixels[x + y*input.width] = groupAves[group];
-        }
-    }
-    output.updatePixels();
-
-    return new color[] {};
-}
 
 //The main algorithm where we extract the pixel art from the input image
 void extract()
@@ -215,10 +136,6 @@ void keyReleased()
     {
         extract();
     }
-    else if(key == 'p')
-    {
-        palettize(10);
-    }
     else if(key == 's') //Save output image
     {
         output.save("data/output.png");
@@ -252,7 +169,7 @@ void controlEvent(ControlEvent event)
         event.isFrom(nbxHuePalette)
     )
     {
-        palettize((int)nbxHuePalette.getValue());
+        palettize((int)nbxHuePalette.getValue(), PalettizeMethod.KMeans);
     }
 }
 
@@ -296,30 +213,22 @@ void draw()
         // stroke(100);
         camera.render(input, input.width, input.height, 0, 0);
 
-        // if(effectiveZoom > 7) //Draw pixel gridlines
-        // {
-        //     strokeWeight(1);
-        //     stroke(255);
-        //     for(int x = 0; x < output.width; x++)
-        //     {
-        //         int inPixelX = x*stepSizeX + stepSizeX/2;
-        //         line(effectiveZoom*inPixelX + offsetX, 0, effectiveZoom*inPixelX + offsetX, height);
-        //     }
-
-        //     for(int y = 0; y < output.height; y++)
-        //     {
-        //         //Map input image pixels to output image
-        //         // int outPixels = x+y*outputW;
-        //         int inPixelY = y*stepSizeY + stepSizeY/2;
-        //         line(0, effectiveZoom*inPixelY + offsetY, width/2, effectiveZoom*inPixelY + offsetY);
-
-        //         // int inPixels = inPixelX+inPixelY*input.width;
-        //         // point(effectiveZoom*inPixelX + offsetX, effectiveZoom*inPixelY + offsetY);
-        //     }
-        // }
+        // if(camera.effectiveZoom > 7)
+        {
+            strokeWeight(0.1);
+            stroke(255, 100);
+            // camera.renderGrid(input.width, input.height, 0, 0, stepSizeX, stepSizeY, output.width, output.height);
+        }
 
         //Draw output image
-        camera.render(output, input.width, input.height, width/2, 0);
+        if(palettized != null)
+        {
+            camera.render(palettized, input.width, input.height, width/2, 0);
+        }
+        else
+        {
+            camera.render(output, input.width, input.height, width/2, 0);
+        }
 
         noClip();
 
